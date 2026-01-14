@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Имя выходного файла
+OUTPUT_FILE="project_dump.txt"
+> $OUTPUT_FILE
+
+rm -f $OUTPUT_FILE
+# Список расширений для сборки
+EXTENSIONS=("java" "kt" "xml" "properties" "go" "py")
+
+echo "--- START OF PROJECT DUMP ---" >> $OUTPUT_FILE
+
+# Рекурсивный поиск файлов
+find . -type f \( -name "*.java" -o -name "*.kt" -o -name "*.xml" -o -name "*.properties" -o -name "*.go" -o -name "*.py" \) \
+  -not -path "*/target/*" \
+  -not -path "*/.git/*" \
+  -not -path "*/build/*" \
+  -not -path "*/node_modules/*" | while read -r file; do
+    echo "========================================" >> $OUTPUT_FILE
+    echo "FILE: $file" >> $OUTPUT_FILE
+    echo "========================================" >> $OUTPUT_FILE
+    cat "$file" >> $OUTPUT_FILE
+    echo -e "\n\n" >> $OUTPUT_FILE
+done
+
+echo "--- END OF PROJECT DUMP ---" >> $OUTPUT_FILE
+echo "Готово! Весь код собран в файл: $OUTPUT_FILE"
