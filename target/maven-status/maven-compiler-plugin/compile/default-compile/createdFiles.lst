@@ -50,6 +50,7 @@ io/cx/ml/cli/services/TokenManager.class
 io/cx/ml/cli/dto/ModelCreateRequestExtended.class
 io/cx/ml/cli/dto/UploadSessionRequest.class
 io/cx/ml/cli/dto/TokenResponse.class
+io/cx/ml/cli/commands/storage/RmCommand.class
 io/cx/ml/cli/clients/EndpointClient.class
 io/cx/ml/cli/dto/EndpointCreateRequestExtended.class
 io/cx/ml/cli/dto/FolderItem.class
@@ -66,6 +67,7 @@ io/cx/ml/cli/services/TestService.class
 io/cx/ml/cli/dto/GpuFlavor.class
 io/cx/ml/cli/dao/ConfigStore.class
 io/cx/ml/cli/dto/InfrastructureResources.class
+io/cx/ml/cli/clients/FileClient.class
 io/cx/ml/cli/dto/PaginatedResponse.class
 io/cx/ml/cli/clients/LoggingResponseFilter.class
 io/cx/ml/cli/exceptions/GlobalExceptionHandler.class

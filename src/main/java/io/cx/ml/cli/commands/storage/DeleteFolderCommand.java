@@ -11,7 +11,7 @@ import picocli.CommandLine.Parameters;
 import java.util.concurrent.Callable;
 
 @RegisterForReflection
-@Command(name = "rm", description = "Удалить папку и всё её содержимое")
+@Command(name = "rmdir", description = "Удалить папку и всё её содержимое")
 public class DeleteFolderCommand implements Callable<Integer> {
 
     @Parameters(index = "0", description = "ID папки для удаления")

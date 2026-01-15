@@ -1,9 +1,11 @@
 package io.cx.ml.cli.services;
 
+import io.cx.ml.cli.clients.FileClient;
 import io.cx.ml.cli.clients.FolderClient;
 import io.cx.ml.cli.clients.SessionClient;
 import io.cx.ml.cli.dto.*;
 import io.cx.ml.cli.utils.HashUtils;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
@@ -15,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cx.ml.cli.dto.ResponseType.EXISTING_FILE;
@@ -35,6 +38,15 @@ public class UploadService {
     private final Map<String, Long> folderCache = new ConcurrentHashMap<>();
 
     private static final int CHUNK_SIZE = 5 * 1024 * 1024;
+
+    @Inject
+    @RestClient
+    FileClient fileClient;
+
+    public Uni<Void> deleteFile(UUID fileId) {
+        System.out.println("Удаление файла " + fileId + "...");
+        return fileClient.deleteFile(fileId);
+    }
 
     public void uploadFile(Path path, Long targetFolderId) throws Exception {
         long totalSize = Files.size(path);

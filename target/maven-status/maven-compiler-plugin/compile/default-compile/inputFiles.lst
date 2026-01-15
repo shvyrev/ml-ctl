@@ -4,6 +4,7 @@
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/ArtifactStoreClient.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/AuthHeaderFactory.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/EndpointClient.java
+/Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/FileClient.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/FolderClient.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/KeycloakAuthClient.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/clients/LoggingResponseFilter.java
@@ -26,6 +27,7 @@
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/commands/storage/DeleteFolderCommand.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/commands/storage/ListFolderCommand.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/commands/storage/MupCommand.java
+/Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/commands/storage/RmCommand.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/commands/storage/TargetOptions.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/commands/storage/UploadCommand.java
 /Users/sergey/projects/cloudx/cx-tui/src/main/java/io/cx/ml/cli/config/AppConfig.java
