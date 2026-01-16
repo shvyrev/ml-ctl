@@ -6,7 +6,7 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import picocli.CommandLine;
 
-@CommandLine.Command(name = "sm", description = "Подготовить модель для Triton")
+@CommandLine.Command(name = "sm", description = "Подготовить модель для инференса")
 public class StoreModelCommand implements Runnable {
 
     @Inject
