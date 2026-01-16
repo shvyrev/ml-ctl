@@ -1,15 +1,15 @@
 package io.cx.ml.cli.dao;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.cx.ml.cli.config.AppConfig;
 import io.cx.ml.cli.config.AuthConfig;
 import io.cx.ml.cli.exceptions.NeedAuthException;
 import io.cx.ml.cli.exceptions.NeedRefreshException;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import lombok.SneakyThrows;
-import lombok.extern.java.Log;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -17,9 +17,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 
-import static java.util.Optional.ofNullable;
-
-@Log
+@Slf4j
 @ApplicationScoped
 public class ConfigStore {
 
@@ -32,6 +30,24 @@ public class ConfigStore {
 
     public Path getConfigPath() {
         return Paths.get(userHome, CONFIG_DIR, CONFIG_FILE);
+    }
+
+    public AppConfig getAppConfig() {
+        return load().orElseGet(() -> new AppConfig().setAuthConfig(new AuthConfig()));
+    }
+
+    public String resolveAccessToken() {
+        AppConfig config = load().orElseThrow(NeedAuthException::new);
+        AuthConfig auth = config.getAuthConfig();
+
+        if (auth == null || auth.noTokens()) throw new NeedAuthException();
+
+        if (auth.isExpired()) {
+            if (auth.hasRefreshToken()) throw new NeedRefreshException();
+            throw new NeedAuthException();
+        }
+
+        return auth.getAccessToken();
     }
 
     public String getAccessToken() {
@@ -65,6 +81,41 @@ public class ConfigStore {
 
     @SneakyThrows
     @JsonIgnore
+    public void save(AppConfig config) {
+        Path path = getConfigPath();
+        Files.createDirectories(path.getParent());
+        json.writeValue(path.toFile(), config);
+        log.info("Config saved to {}", path);
+    }
+
+    public void updateAuth(AuthConfig auth) {
+        AppConfig current = getAppConfig();
+        current.setAuthConfig(auth);
+        save(current);
+    }
+
+    public String getAccessTokenOrThrow() {
+        AppConfig config = getAppConfig();
+        AuthConfig auth = config.getAuthConfig();
+
+        if (auth == null || auth.noTokens()) {
+            throw new NeedAuthException();
+        }
+
+        if (auth.isExpired()) {
+            if (auth.hasRefreshToken()) {
+                log.warn("Token expired, refresh required");
+                throw new NeedRefreshException();
+            } else {
+                throw new NeedAuthException();
+            }
+        }
+
+        return auth.getAccessToken();
+    }
+
+    @SneakyThrows
+    @JsonIgnore
     public AppConfig store(AppConfig config) {
         log.info("$ "+ "store() called");
         Path configPath = getConfigPath();
@@ -74,18 +125,15 @@ public class ConfigStore {
     }
 
     public Optional<AppConfig> load() {
+        Path path = getConfigPath();
+        if (!Files.exists(path)) return Optional.empty();
 
-        return ofNullable(getConfigPath())
-                .filter(Files::exists)
-                .map(Path::toFile)
-                .map(f -> {
-//                    TODO: добавить rethrow
-                    try {
-                        return json.readValue(f, AppConfig.class);
-                    } catch (IOException e) {
-                        return null;
-                    }
-                });
+        try {
+            return Optional.ofNullable(json.readValue(path.toFile(), AppConfig.class));
+        } catch (IOException e) {
+            log.error("Failed to read config: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     public void store(AuthConfig authConfig) {

@@ -17,4 +17,6 @@ import lombok.extern.java.Log;
 @RegisterForReflection
 public class AppConfig {
     private AuthConfig authConfig;
+    private String servingApiUrl = "http://localhost:8081";
+    private String artifactApiUrl = "http://localhost:8083";
 }

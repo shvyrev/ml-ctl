@@ -11,10 +11,11 @@ import picocli.CommandLine.Spec;
         version = "1.0.0",
         description = "CLI для взаимодействия с ML кластером",
         subcommands = {
-                LoginCommand.class,   // Системная: логин
-                StorageCommand.class, // Группа: cx3:// (Artifact Store)
-                ModelCommand.class,    // Группа: v1/model (Serving)
-                EndpointCommand.class // ГруппаЖ v1/endpoint (Serving)
+                InitCommand.class,      // Системная: инициализация
+                LoginCommand.class,     // Системная: логин
+                StorageCommand.class,   // Группа: cx3:// (Artifact Store)
+                ModelCommand.class,     // Группа: v1/model (Serving)
+                EndpointCommand.class   // ГруппаЖ v1/endpoint (Serving)
         })
 public class MainCommand implements Runnable {
 

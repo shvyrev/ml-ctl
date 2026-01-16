@@ -13,8 +13,6 @@ import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import java.net.URI;
 import java.util.Optional;
 
-import static java.util.function.Predicate.not;
-
 @ApplicationScoped
 public class TokenManager {
 
