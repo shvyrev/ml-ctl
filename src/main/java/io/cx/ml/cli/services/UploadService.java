@@ -55,6 +55,7 @@ public class UploadService {
         // 2. Считаем хэш
         System.out.println("Вычисление контрольной суммы...");
         String etag = HashUtils.calculateETag(path);
+        System.out.println("ETAG : " + etag);
 
         // 3. Создаем сессию со ВСЕМИ полями
         UploadSessionRequest initReq = new UploadSessionRequest();
@@ -65,6 +66,8 @@ public class UploadService {
 
         System.out.println("Инициализация сессии на сервере...");
         UploadSessionResponse session = sessionClient.createSession(initReq);
+
+        System.out.println("Sending CreateSession: name=" + initReq.getFileName() + ", size=" + initReq.getUploadLength() + ", size=" + initReq.getUploadLength() + ", hash=" + initReq.getExpectedEtag() + ", folder={}" + initReq.getFolderId());
 
         if (session.getType() != null && session.getType().equals(EXISTING_FILE)) {
             System.out.println("  [v] Дедупликация: " + path.getFileName());
@@ -102,36 +105,40 @@ public class UploadService {
 
     // Основной метод загрузки (теперь один)
     public void uploadFile(Path path, Long targetFolderId, String cloudPath) throws Exception {
-        Long folderId = targetFolderId;
-
-        // 1. Резолвим путь, если он передан
+        // 1. Сначала определяем папку (делаем это атомарно, чтобы не плодить дубликаты)
+        Long folderId;
         if (cloudPath != null && !cloudPath.isBlank() && !cloudPath.equals("/")) {
-            // Используем кэш, чтобы не дергать сервер постоянно
+            // Используем computeIfAbsent для потокобезопасности
             folderId = folderCache.computeIfAbsent(cloudPath, this::resolveFolderId);
-        } else if (folderId == null || folderId == 0) {
-            folderId = folderClient.getRootFolder().getId();
+        } else {
+            folderId = (targetFolderId != null && targetFolderId != 0)
+                    ? targetFolderId
+                    : folderClient.getRootFolder().getId();
         }
 
-        long totalSize = Files.size(path);
+        // 2. Считаем хэш и СРАЗУ выводим его с именем файла, чтобы не путаться
         String etag = HashUtils.calculateETag(path);
 
+        System.out.println("Инициализация: " + path.getFileName() + " | HASH: " + etag + " | Folder: " + folderId);
+
+        // 3. Формируем запрос
         UploadSessionRequest initReq = new UploadSessionRequest();
         initReq.setFileName(path.getFileName().toString());
-        initReq.setUploadLength(totalSize);
-        initReq.setExpectedEtag(etag);
+        initReq.setUploadLength(Files.size(path));
+        initReq.setExpectedEtag(etag); // Теперь хэш точно соответствует файлу
         initReq.setFolderId(folderId);
 
-        System.out.println("\nИнициализация: " + path.getFileName() + " (Folder: " + folderId + ")");
+        // 4. Создаем сессию
         UploadSessionResponse session = sessionClient.createSession(initReq);
 
-        // Проверка дедупликации
+        // Проверка дедупликации (200 OK вместо 201)
         if (session.getType() != null && session.getType().equals(EXISTING_FILE)) {
-            System.out.println("  [v] Дедупликация: " + path.getFileName());
+            System.out.println("  [v] Дедупликация (уже есть на сервере): " + path.getFileName());
             return;
         }
 
-        // 2. Логика отправки чанков (вынеси в приватный метод для чистоты)
-        performChunkedUpload(path, session, totalSize);
+        // 5. Загрузка чанков
+        performChunkedUpload(path, session, initReq.getUploadLength());
     }
 
     private void performChunkedUpload(Path path, UploadSessionResponse session, long totalSize) throws Exception {
