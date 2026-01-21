@@ -7,6 +7,7 @@ import org.eclipse.microprofile.rest.client.inject.RestClient;
 import picocli.CommandLine;
 
 @CommandLine.Command(name = "sm", description = "Подготовить модель для инференса")
+@Deprecated
 public class StoreModelCommand implements Runnable {
 
     @Inject

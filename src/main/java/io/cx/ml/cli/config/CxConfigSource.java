@@ -1,6 +1,11 @@
 package io.cx.ml.cli.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.quarkus.logging.Log;
+import io.quarkus.runtime.annotations.StaticInitSafe;
+import lombok.extern.slf4j.Slf4j;
+
 import org.eclipse.microprofile.config.spi.ConfigSource;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,6 +14,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+//@StaticInitSafe
+@Slf4j
 public class CxConfigSource implements ConfigSource {
 
     private final Map<String, String> properties = new HashMap<>();
@@ -33,6 +40,7 @@ public class CxConfigSource implements ConfigSource {
                 }
             } catch (Exception e) {
                 // В лог писать рано, просто игнорируем ошибки парсинга при старте
+                log.error("config load exception", e);
             }
         }
     }
