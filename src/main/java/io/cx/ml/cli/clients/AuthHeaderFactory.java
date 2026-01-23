@@ -1,6 +1,7 @@
 package io.cx.ml.cli.clients;
 
 import io.cx.ml.cli.dao.ConfigStore;
+import io.cx.ml.cli.services.TokenService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.core.MultivaluedHashMap;
@@ -13,20 +14,19 @@ import org.eclipse.microprofile.rest.client.ext.ClientHeadersFactory;
 public class AuthHeaderFactory implements ClientHeadersFactory {
 
     @Inject
-    ConfigStore configStore;
+    TokenService tokenService;
 
     @Override
     public MultivaluedMap<String, String> update(MultivaluedMap<String, String> incoming,
                                                  MultivaluedMap<String, String> outgoing) {
         MultivaluedMap<String, String> result = new MultivaluedHashMap<>();
-        try {
-            String token = configStore.resolveAccessToken();
-            result.add("Authorization", "Bearer " + token);
-        } catch (Exception e) {
-            log.warn("No token found", e);
-            // Если токена нет, запрос уйдет без заголовка (сервер вернет 401)
-            // Либо можно логировать здесь необходимость логина
-        }
+
+        // Метод getValidAccessToken сам проверит срок и сделает refresh если нужно
+        tokenService.getValidAccessToken().ifPresentOrElse(
+                token -> result.add("Authorization", "Bearer " + token),
+                () -> log.warn("Не удалось получить валидный токен. Запрос уйдет без авторизации.")
+        );
+
         return result;
     }
 }

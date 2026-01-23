@@ -13,6 +13,7 @@ import java.util.UUID;
 
 @Path("/api/v1/model") // Соответствует Swagger пути /api/v1/model
 @RegisterRestClient(configKey = "serving-api")
+@RegisterProvider(AuthResponseFilter.class)
 @RegisterClientHeaders(AuthHeaderFactory.class)
 @RegisterProvider(LoggingResponseFilter.class)
 @Produces(MediaType.APPLICATION_JSON)

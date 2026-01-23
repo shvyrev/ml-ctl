@@ -1,132 +1,153 @@
 package io.cx.ml.cli.services;
 
-import io.cx.ml.cli.auth.TokenData;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
+import io.cx.ml.cli.clients.KeycloakAuthClient;
+import io.cx.ml.cli.config.AppConfig;
+import io.cx.ml.cli.config.AuthConfig;
+import io.cx.ml.cli.dao.ConfigStore;
+import io.cx.ml.cli.dto.TokenResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
+import org.eclipse.microprofile.rest.client.RestClientBuilder;
+
+import java.net.URI;
 import java.util.Optional;
 
 /**
- * Сервис для управления токенами аутентификации.
- * Сохраняет и загружает токены из файла конфигурации в домашней директории.
+ * Основной сервис для работы с токенами.
+ * Объединяет работу с конфигурацией (диск) и Keycloak (сеть).
  */
+@Slf4j
 @ApplicationScoped
 public class TokenService {
 
-    private static final String CONFIG_DIR = ".cx";
-    private static final String CONFIG_FILE = "config";
-
     @Inject
-    ObjectMapper objectMapper;
-
-    @ConfigProperty(name = "user.home")
-    String userHome;
-
-    private Path getConfigPath() {
-        return Paths.get(userHome, CONFIG_DIR, CONFIG_FILE);
-    }
+    ConfigStore configStore;
 
     /**
-     * Загружает токены из файла конфигурации.
-     * @return TokenData или null, если файл не существует или некорректен.
-     */
-    public TokenData loadTokens() {
-        Path path = getConfigPath();
-        if (!Files.exists(path)) {
-            return null;
-        }
-        try {
-            byte[] bytes = Files.readAllBytes(path);
-            return objectMapper.readValue(bytes, TokenData.class);
-        } catch (IOException e) {
-            // Логирование ошибки
-            System.err.println("Failed to load tokens from " + path + ": " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Сохраняет токены в файл конфигурации.
-     * @param tokenData данные токенов
-     */
-    public void saveTokens(TokenData tokenData) {
-        Path path = getConfigPath();
-        try {
-            Files.createDirectories(path.getParent());
-            byte[] bytes = objectMapper.writeValueAsBytes(tokenData);
-            Files.write(path, bytes);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to save tokens to " + path, e);
-        }
-    }
-
-    /**
-     * Проверяет, истек ли срок действия access токена.
-     * @param tokenData данные токенов
-     * @return true если токен просрочен или отсутствует
-     */
-    public boolean isTokenExpired(TokenData tokenData) {
-        if (tokenData == null || tokenData.getAccessToken() == null) {
-            return true;
-        }
-        Long expiresAt = tokenData.getExpiresAt();
-        if (expiresAt == null) {
-            return true;
-        }
-        return System.currentTimeMillis() >= expiresAt;
-    }
-
-    /**
-     * Обновляет токены с использованием refresh токена.
-     * @param oldToken текущие токены
-     * @return новые токены
-     * @throws IOException если обновление не удалось
-     */
-    public TokenData refreshTokens(TokenData oldToken) throws IOException {
-        if (oldToken.getRefreshToken() == null) {
-            throw new IOException("No refresh token available");
-        }
-        // Заглушка: в реальности нужно вызвать Keycloak endpoint
-        // Для простоты выбросим исключение, требующее повторного логина
-        throw new IOException("Token refresh not implemented. Please login again.");
-    }
-
-    /**
-     * Возвращает валидный access токен, при необходимости обновляя его.
-     * @return access токен
-     * @throws RuntimeException если токены отсутствуют или не могут быть обновлены
+     * Возвращает живой Access Token.
+     * Если токен просрочен — пытается обновить через Refresh Token.
      */
     public Optional<String> getValidAccessToken() {
-        TokenData tokenData = loadTokens();
-        if (tokenData == null) {
-            return Optional.empty();
-        }
-        if (isTokenExpired(tokenData)) {
-            try {
-                tokenData = refreshTokens(tokenData);
-            } catch (IOException e) {
-                // Если refresh не удался, возвращаем пустой Optional
-                return Optional.empty();
-            }
-        }
-        return Optional.of(tokenData.getAccessToken());
+        return configStore.load()
+                .map(AppConfig::getAuthConfig)
+                .flatMap(authConfig -> {
+                    // Если токенов вообще нет — выходим
+                    if (authConfig.noTokens()) {
+                        return Optional.empty();
+                    }
+
+                    // Если просрочен — обновляем
+                    if (authConfig.isExpired()) {
+                        return refresh()
+                                .map(TokenResponse::getAccessToken);
+                    }
+
+                    return Optional.ofNullable(authConfig.getAccessToken());
+                });
     }
 
     /**
-     * Удаляет сохраненные токены (логаут).
+     * Выполняет вход по логину и паролю.
+     */
+    public Optional<TokenResponse> login(String user, String pass) {
+        AppConfig config = configStore.load().orElseGet(this::createDefaultConfig);
+        AuthConfig auth = config.getAuthConfig();
+
+        try {
+            String fullUrl = String.format("%s/realms/%s", auth.getUrl(), auth.getRealm());
+            TokenResponse resp = getClient(fullUrl).fetchToken(
+                    "password",
+                    auth.getClientId(),
+                    auth.getClientSecret(),
+                    user,
+                    pass,
+                    null
+            );
+
+            updateAndSaveConfig(config, resp);
+            return Optional.of(resp);
+        } catch (Exception e) {
+            System.err.println("Login failed: " + e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Обновляет сессию, используя имеющийся Refresh Token.
+     */
+    public Optional<TokenResponse> refresh() {
+        return configStore.load().flatMap(config -> {
+            AuthConfig auth = config.getAuthConfig();
+            if (!auth.hasRefreshToken()) {
+                return Optional.empty();
+            }
+
+            try {
+                String fullUrl = String.format("%s/realms/%s", auth.getUrl(), auth.getRealm());
+                TokenResponse resp = getClient(fullUrl).fetchToken(
+                        "refresh_token",
+                        auth.getClientId(),
+                        auth.getClientSecret(),
+                        null,
+                        null,
+                        auth.getRefreshToken()
+                );
+
+                updateAndSaveConfig(config, resp);
+                return Optional.of(resp);
+            } catch (Exception e) {
+                // Если refresh не удался (400 Bad Request), значит refresh_token тоже сдох.
+                // Очищаем токены, чтобы пользователь точно знал, что нужно логиниться.
+                log.error("Сессия истекла. Очистка старых токенов...");
+                clearTokens();
+                return Optional.empty();
+            }
+        });
+    }
+    /**
+     * Создает REST клиент динамически, так как URL может меняться пользователем.
+     */
+    @SneakyThrows
+    private KeycloakAuthClient getClient(String fullUrl) {
+        return RestClientBuilder.newBuilder()
+                .baseUri(URI.create(fullUrl))
+                .build(KeycloakAuthClient.class);
+    }
+
+    /**
+     * Обновляет объект конфига данными из ответа Keycloak и пишет на диск.
+     */
+    private void updateAndSaveConfig(AppConfig config, TokenResponse resp) {
+        AuthConfig auth = config.getAuthConfig();
+        auth.setAccessToken(resp.getAccessToken());
+        auth.setRefreshToken(resp.getRefreshToken());
+        // Рассчитываем время истечения: текущий момент + секунды из ответа
+        auth.setExpiresAt(System.currentTimeMillis() + (resp.getExpiresIn() * 1000));
+
+        configStore.store(config);
+    }
+
+    private AppConfig createDefaultConfig() {
+        return new AppConfig().setAuthConfig(
+                new AuthConfig()
+                        .setUrl("http://localhost:8082")
+                        .setRealm("model-registry-realm")
+                        .setClientId("model-registry-app")
+                        .setClientSecret("LZbXY16jR0BRFazUKO3qTAoqXL3Uoet7")
+        );
+    }
+
+    /**
+     * Сброс токенов (Logout)
      */
     public void clearTokens() {
-        Path path = getConfigPath();
-        try {
-            Files.deleteIfExists(path);
-        } catch (IOException e) {
-            // игнорируем
-        }
+        configStore.load().ifPresent(config -> {
+            config.getAuthConfig().setAccessToken(null);
+            config.getAuthConfig().setRefreshToken(null);
+            config.getAuthConfig().setExpiresAt(0);
+            configStore.store(config);
+        });
     }
 }

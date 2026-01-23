@@ -1,7 +1,7 @@
 package io.cx.ml.cli.commands;
 
 import io.cx.ml.cli.dto.TokenResponse;
-import io.cx.ml.cli.services.TokenManager;
+import io.cx.ml.cli.services.TokenService;
 import jakarta.inject.Inject;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -13,7 +13,7 @@ import java.util.Optional;
 public class LoginCommand implements Runnable {
 
     @Inject
-    TokenManager tokenService;
+    TokenService tokenService;
 
     @Option(names = {"-u", "--username"}, description = "Username")
     String username;
