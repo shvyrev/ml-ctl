@@ -12,7 +12,9 @@ import io.cx.ml.cli.commands.storage.*;
                 DeleteFolderCommand.class, // rmdir (здесь Long ID)
                 UploadCommand.class,       // up
                 MupCommand.class,          // mup
-                RmCommand.class            // rm (здесь по UUID)
+                RmCommand.class,            // rm (здесь по UUID)
+                PurgeCommand.class,         // purge
+                ListAllCommand.class      // tree
         })
 public class StorageCommand {
 }

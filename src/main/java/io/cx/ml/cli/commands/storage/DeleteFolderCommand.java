@@ -42,7 +42,17 @@ public class DeleteFolderCommand implements Callable<Integer> {
                 }
             }
         } catch (Exception e) {
-            System.err.println("\nОшибка при удалении: " + e.getMessage());
+            if (e.getCause() instanceof jakarta.ws.rs.WebApplicationException webEx) {
+                Response response = webEx.getResponse();
+                // Пытаемся прочитать тело как строку, чтобы увидеть JSON от маппера
+                String errorBody = response.readEntity(String.class);
+                System.err.println("ОШИБКА СЕРВЕРА (" + response.getStatus() + "): " + errorBody);
+            } else if (e instanceof jakarta.ws.rs.WebApplicationException webEx) {
+                String errorBody = webEx.getResponse().readEntity(String.class);
+                System.err.println("ОШИБКА СЕРВЕРА (" + webEx.getResponse().getStatus() + "): " + errorBody);
+            } else {
+                System.err.println("ЛОКАЛЬНАЯ ОШИБКА: " + e.getMessage());
+            }
             return 1;
         }
     }

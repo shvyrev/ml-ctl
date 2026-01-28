@@ -11,7 +11,7 @@ import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import java.util.List;
 import java.util.UUID;
 
-@Path("/api/v1/model") // Соответствует Swagger пути /api/v1/model
+@Path("/api/v1/model")
 @RegisterRestClient(configKey = "serving-api")
 @RegisterProvider(AuthResponseFilter.class)
 @RegisterClientHeaders(AuthHeaderFactory.class)
